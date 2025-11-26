@@ -166,7 +166,13 @@ class ScoringEngine:
         """
         Check if pattern exists in text.
         Uses word boundary matching for short patterns to avoid false positives.
+        Special handling for "$" to match dollar amounts.
         """
+        # Special case: "$" should match dollar amounts (e.g., "$1925", "$1,000", "$500.00")
+        if pattern == "$":
+            # Match $ followed by at least one digit (handles formats like $100, $1,000, $500.00)
+            return bool(re.search(r'\$\d', text))
+        
         if len(pattern) <= 3:
             # For short patterns like "PCO", use word boundaries
             # to avoid matching "COSTCO" when looking for "CO"

@@ -6,12 +6,13 @@ Coordinates Outlook client, scoring engine, and rules.
 import time
 import logging
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
-from outlook_client import OutlookClient, EmailMessage
-from scoring_engine import ScoringEngine, ScoringResult
-from config_loader import load_settings, load_category_rules
+from .adapters.outlook_client import OutlookClient
+from .core.scoring_engine import ScoringEngine
+from .core.models import EmailMessage, ScoringResult
+from .services.rule_manager import RuleManager
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +26,22 @@ class EmailCategorizer:
         dry_run: bool = True,
         poll_interval: int = 60
     ):
-        self.config_dir = config_dir
+        """
+        Initialize categorizer.
+        
+        Args:
+            config_dir: Configuration directory
+            dry_run: If True, log but don't apply categories
+            poll_interval: Seconds between email checks
+        """
+        self.config_dir = Path(config_dir)
         self.dry_run = dry_run
         self.poll_interval = poll_interval
         
         self.outlook = OutlookClient()
-        self.scoring_engine = None
-        self.last_run_time = None
-        self.deploy_marker_file = config_dir.parent / "data" / "deployed_at.txt"
+        self.scoring_engine: Optional[ScoringEngine] = None
+        self.last_run_time: Optional[datetime] = None
+        self.deploy_marker_file = self.config_dir.parent / "data" / "deployed_at.txt"
         
         # Load rules
         self._load_rules()
@@ -40,8 +49,13 @@ class EmailCategorizer:
     def _load_rules(self):
         """Load category rules from config directory."""
         rules_dir = self.config_dir / "rules"
-        rules = load_category_rules(rules_dir)
-        self.scoring_engine = ScoringEngine(rules)
+        rule_manager = RuleManager(rules_dir)
+        rules = rule_manager.load_all_rules()
+        
+        from .core.pattern_matcher import PatternMatcher
+        matcher = PatternMatcher()
+        self.scoring_engine = ScoringEngine(rules, matcher)
+        
         logger.info(f"Loaded {len(rules)} category rule(s): {[r.category_name for r in rules]}")
     
     def _get_start_time(self) -> datetime:
@@ -50,7 +64,7 @@ class EmailCategorizer:
         On first run, creates a deployment marker.
         """
         # Ensure data directory exists
-        self.deploy_marker_file.parent.mkdir(exist_ok=True)
+        self.deploy_marker_file.parent.mkdir(parents=True, exist_ok=True)
         
         if self.deploy_marker_file.exists():
             # Use saved deployment time
@@ -87,7 +101,7 @@ class EmailCategorizer:
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                logger.error(f"Error in processing loop: {e}")
+                logger.error(f"Error in processing loop: {e}", exc_info=True)
                 # Wait a bit longer on error before retry
                 time.sleep(self.poll_interval * 2)
     
@@ -114,12 +128,6 @@ class EmailCategorizer:
     
     def _categorize_email(self, email: EmailMessage):
         """Score and categorize a single email."""
-        # DEBUG: See what we're actually reading
-        print(f"SUBJECT: {email.subject}")
-        print(f"BODY LENGTH: {len(email.body)} chars")
-        print(f"BODY PREVIEW: {email.body[:200]}")
-        print("-" * 40)
-        
         # Score against all rules
         results = self.scoring_engine.score_email(email)
         
@@ -182,8 +190,6 @@ class EmailCategorizer:
         Test scoring against provided text (no Outlook needed).
         Useful for testing rules without actual emails.
         """
-        from outlook_client import EmailMessage
-        
         test_email = EmailMessage(
             entry_id="TEST",
             subject=subject,
@@ -198,3 +204,4 @@ class EmailCategorizer:
         )
         
         return self.scoring_engine.score_email(test_email)
+

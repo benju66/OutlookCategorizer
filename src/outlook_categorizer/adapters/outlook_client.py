@@ -1,13 +1,14 @@
 """
-Outlook COM interface.
+Outlook COM interface adapter.
 All Outlook-specific code is isolated here.
 """
 
 import re
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
+
+from ..core.models import EmailMessage
 
 logger = logging.getLogger(__name__)
 
@@ -38,23 +39,6 @@ def _strip_html(html: str) -> str:
     text = re.sub(r'[ \t]+', ' ', text)       # Collapse spaces
     
     return text.strip()
-
-
-@dataclass
-class EmailMessage:
-    """Represents an email message with extracted content."""
-    entry_id: str
-    subject: str
-    body: str
-    sender_email: str
-    sender_name: str
-    received_time: datetime
-    attachment_names: list[str]
-    categories: list[str]
-    conversation_id: str
-    
-    # Reference to original Outlook item (for applying categories)
-    _outlook_item: object = None
 
 
 class OutlookClient:
@@ -189,7 +173,7 @@ class OutlookClient:
                 logger.debug(f"Error extracting body: {e}")
                 pass
             
-            return EmailMessage(
+            email = EmailMessage(
                 entry_id=item.EntryID,
                 subject=item.Subject or "",
                 body=body,
@@ -199,8 +183,10 @@ class OutlookClient:
                 attachment_names=attachment_names,
                 categories=categories,
                 conversation_id=getattr(item, 'ConversationID', ''),
-                _outlook_item=item
             )
+            # Set PrivateAttr after instantiation (can't be set in constructor)
+            email._outlook_item = item
+            return email
             
         except Exception as e:
             logger.warning(f"Error extracting email: {e}")
@@ -247,3 +233,4 @@ class OutlookClient:
         except Exception as e:
             logger.warning(f"Could not retrieve categories: {e}")
         return categories
+

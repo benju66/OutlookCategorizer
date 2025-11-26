@@ -41,7 +41,7 @@ strong_signals:
     description: "Change Order Request"
     
   - pattern: "change order"
-    location: subject_contains
+    location: anywhere
     weight: 45
     
   - pattern: "cost proposal"
@@ -56,7 +56,12 @@ strong_signals:
 medium_signals:
   - pattern: "pricing"
     location: body_contains
-    weight: 25
+    weight: 40
+    
+  - pattern: "your pricing"
+    location: anywhere
+    weight: 40
+    description: "Common phrase when providing pricing information"
     
   - pattern: "quote"
     location: body_contains
@@ -77,6 +82,21 @@ medium_signals:
   - pattern: "additional cost"
     location: anywhere
     weight: 25
+    
+  - pattern: "cost add"
+    location: anywhere
+    weight: 35
+    description: "Cost addition phrase"
+    
+  - pattern: "cost to add"
+    location: anywhere
+    weight: 35
+    description: "Cost to add phrase"
+    
+  - pattern: "add for"
+    location: anywhere
+    weight: 30
+    description: "Addition phrase (e.g., 'cost add for')"
     
   - pattern: "T&M"
     location: anywhere
@@ -114,6 +134,21 @@ medium_signals:
   - pattern: "cost increase"
     location: anywhere
     weight: 35
+    
+  - pattern: "ADD $"
+    location: anywhere
+    weight: 40
+    description: "Explicit cost addition statement"
+    
+  - pattern: "add $"
+    location: anywhere
+    weight: 40
+    description: "Explicit cost addition statement"
+    
+  - pattern: "$"
+    location: anywhere
+    weight: 30
+    description: "Dollar amount indicator (any format: $100, $1,000, etc.)"
 
 # Attachment signals
 attachment_signals:
