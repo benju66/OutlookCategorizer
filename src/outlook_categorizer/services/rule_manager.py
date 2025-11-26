@@ -35,10 +35,20 @@ class RuleManager:
             List of CategoryRule objects (only enabled rules)
         """
         rules = []
+        seen_names = set()
+        
         for rule_file in self.rules_dir.glob("*.yaml"):
             try:
                 rule = self.load_rule(rule_file)
                 if rule.enabled:
+                    # Check for duplicate category names
+                    if rule.category_name in seen_names:
+                        logger.warning(
+                            f"Duplicate category name '{rule.category_name}' "
+                            f"found in {rule_file.name}. Skipping duplicate."
+                        )
+                        continue
+                    seen_names.add(rule.category_name)
                     rules.append(rule)
             except Exception as e:
                 logger.error(f"Failed to load rule from {rule_file}: {e}")

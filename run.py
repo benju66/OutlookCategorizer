@@ -5,15 +5,14 @@ Entry point - starts the email listener
 """
 
 import sys
-import time
 import logging
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from categorizer import EmailCategorizer
-from config_loader import load_settings
+from outlook_categorizer.categorizer import EmailCategorizer
+from outlook_categorizer.adapters.config_loader import ConfigLoader
 
 
 def setup_logging(log_dir: Path) -> None:
@@ -21,7 +20,7 @@ def setup_logging(log_dir: Path) -> None:
     log_dir.mkdir(exist_ok=True)
     
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s | %(levelname)-8s | %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         handlers=[
@@ -40,12 +39,13 @@ def main():
     logger = logging.getLogger(__name__)
     
     logger.info("=" * 60)
-    logger.info("Outlook Email Categorization Engine")
+    logger.info("Outlook Email Categorization Engine v2.0")
     logger.info("=" * 60)
     
     # Load settings
     try:
-        settings = load_settings(root_dir / "config" / "settings.yaml")
+        loader = ConfigLoader()
+        settings = loader.load_yaml(root_dir / "config" / "settings.yaml")
     except Exception as e:
         logger.error(f"Failed to load settings: {e}")
         sys.exit(1)
@@ -74,9 +74,10 @@ def main():
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
+

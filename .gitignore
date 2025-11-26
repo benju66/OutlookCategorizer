@@ -19,6 +19,9 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pyc
+*.pyo
+*.pyd
 
 # Virtual Environment
 venv/
@@ -32,6 +35,8 @@ ENV/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
 # Logs
 logs/
@@ -40,7 +45,17 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Project specific
 data/deployed_at.txt
+
+# Backup files
+*.backup
+*.bak
+*.old
+*~
+
+# Archive (if you want to keep it out of git)
+# archive/
 

@@ -6,14 +6,14 @@ Paste email content and see how it would be scored.
 
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from config_loader import load_category_rules
-from scoring_engine import ScoringEngine
-from outlook_client import EmailMessage
-from datetime import datetime
+from outlook_categorizer.core.models import EmailMessage
+from outlook_categorizer.core.scoring_engine import ScoringEngine
+from outlook_categorizer.services.rule_manager import RuleManager
 
 
 def test_email(scoring_engine: ScoringEngine, subject: str, body: str, attachments: list[str] = None):
@@ -46,7 +46,7 @@ def test_email(scoring_engine: ScoringEngine, subject: str, body: str, attachmen
     results = scoring_engine.score_email(email)
     
     for result in results:
-        status = "✅ WOULD APPLY" if result.should_apply else "❌ Would not apply"
+        status = "[APPLY]" if result.should_apply else "[SKIP]"
         print(f"\n{status}: {result.category_name}")
         print(f"Score: {result.score} (threshold: {result.threshold})")
         
@@ -61,14 +61,19 @@ def test_email(scoring_engine: ScoringEngine, subject: str, body: str, attachmen
 
 
 def main():
+    """Main test function."""
     # Load rules
     root_dir = Path(__file__).parent
     rules_dir = root_dir / "config" / "rules"
-    rules = load_category_rules(rules_dir)
+    
+    rule_manager = RuleManager(rules_dir)
+    rules = rule_manager.load_all_rules()
     
     print(f"Loaded {len(rules)} category rule(s): {[r.category_name for r in rules]}")
     
-    scoring_engine = ScoringEngine(rules)
+    from outlook_categorizer.core.pattern_matcher import PatternMatcher
+    matcher = PatternMatcher()
+    scoring_engine = ScoringEngine(rules, matcher)
     
     # Test cases
     print("\n" + "#" * 60)
@@ -125,11 +130,11 @@ def main():
         body="Please authorize the following T&M work for the electrical changes."
     )
     
-    # Test 8: Edge case - just "price" alone (should NOT match)
+    # Test 8: Dollar amount (should match)
     test_email(
         scoring_engine,
-        subject="Meeting Tomorrow",
-        body="Let's discuss the price of the fixtures tomorrow."
+        subject="OP III - Unit Updates",
+        body="To add relocate the heat lap switch. ADD $1925. Let us know if this is approved."
     )
     
     print("\n" + "#" * 60)
@@ -153,3 +158,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
