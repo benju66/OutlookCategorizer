@@ -1,0 +1,7 @@
+# Outlook Email Categorizer - Dependencies
+
+# Outlook COM interface (Windows only)
+pywin32>=306
+
+# YAML configuration parsing
+pyyaml>=6.0

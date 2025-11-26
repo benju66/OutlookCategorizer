@@ -1,0 +1,175 @@
+# Pricing Category Rules
+# ======================
+# 
+# Signals are weighted and combined to produce a score.
+# If score >= threshold, the "Pricing" category is applied.
+#
+# Signal types:
+#   subject_contains  - Found in email subject (case-insensitive)
+#   body_contains     - Found in email body (case-insensitive)
+#   anywhere          - Found in subject OR body
+#   attachment_name   - Found in attachment filename
+#   sender_contains   - Found in sender email address
+#   negative          - SUBTRACTS from score (for false positive prevention)
+
+category_name: "Pricing"
+outlook_category: "Pricing"  # Must match exact Outlook category name
+threshold: 40
+
+# Strong signals - high confidence indicators
+strong_signals:
+  - pattern: "PCO"
+    location: subject_contains
+    weight: 50
+    description: "Potential Change Order in subject"
+    
+  - pattern: "PCO-"
+    location: anywhere
+    weight: 50
+    
+  - pattern: "PCO #"
+    location: anywhere
+    weight: 50
+    
+  - pattern: "PCO#"
+    location: anywhere
+    weight: 50
+    
+  - pattern: "COR"
+    location: subject_contains
+    weight: 45
+    description: "Change Order Request"
+    
+  - pattern: "change order"
+    location: subject_contains
+    weight: 45
+    
+  - pattern: "cost proposal"
+    location: anywhere
+    weight: 45
+    
+  - pattern: "pricing request"
+    location: anywhere
+    weight: 45
+
+# Medium signals - good indicators, especially in combination
+medium_signals:
+  - pattern: "pricing"
+    location: body_contains
+    weight: 25
+    
+  - pattern: "quote"
+    location: body_contains
+    weight: 20
+    
+  - pattern: "quotation"
+    location: body_contains
+    weight: 20
+    
+  - pattern: "cost impact"
+    location: anywhere
+    weight: 30
+    
+  - pattern: "budget impact"
+    location: anywhere
+    weight: 25
+    
+  - pattern: "additional cost"
+    location: anywhere
+    weight: 25
+    
+  - pattern: "T&M"
+    location: anywhere
+    weight: 30
+    description: "Time and Materials"
+    
+  - pattern: "time and material"
+    location: anywhere
+    weight: 30
+    
+  - pattern: "provide pricing"
+    location: anywhere
+    weight: 35
+    
+  - pattern: "send pricing"
+    location: anywhere
+    weight: 35
+    
+  - pattern: "submit pricing"
+    location: anywhere
+    weight: 35
+    
+  - pattern: "need pricing"
+    location: anywhere
+    weight: 35
+    
+  - pattern: "request for pricing"
+    location: anywhere
+    weight: 40
+    
+  - pattern: "price increase"
+    location: anywhere
+    weight: 35
+    
+  - pattern: "cost increase"
+    location: anywhere
+    weight: 35
+
+# Attachment signals
+attachment_signals:
+  - pattern: "PCO"
+    weight: 45
+    
+  - pattern: "quote"
+    weight: 30
+    
+  - pattern: "pricing"
+    weight: 35
+    
+  - pattern: "cost proposal"
+    weight: 40
+    
+  - pattern: "COR"
+    weight: 40
+
+# Weak signals - only meaningful with other signals
+weak_signals:
+  - pattern: "price"
+    location: body_contains
+    weight: 8
+    
+  - pattern: "cost"
+    location: body_contains
+    weight: 5
+    
+  - pattern: "budget"
+    location: body_contains
+    weight: 5
+
+# Negative signals - reduce score to prevent false positives
+negative_signals:
+  - pattern: "no cost impact"
+    weight: -35
+    
+  - pattern: "at no additional cost"
+    weight: -35
+    
+  - pattern: "no additional cost"
+    weight: -35
+    
+  - pattern: "no change in price"
+    weight: -30
+    
+  - pattern: "no change to price"
+    weight: -30
+    
+  - pattern: "no charge"
+    weight: -25
+    
+  - pattern: "cost of living"
+    weight: -20
+    description: "Common in unrelated contexts"
+    
+  - pattern: "price is right"
+    weight: -20
+    description: "Colloquial usage"

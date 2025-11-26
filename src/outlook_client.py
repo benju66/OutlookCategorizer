@@ -1,0 +1,212 @@
+"""
+Outlook COM interface.
+All Outlook-specific code is isolated here.
+"""
+
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EmailMessage:
+    """Represents an email message with extracted content."""
+    entry_id: str
+    subject: str
+    body: str
+    sender_email: str
+    sender_name: str
+    received_time: datetime
+    attachment_names: list[str]
+    categories: list[str]
+    conversation_id: str
+    
+    # Reference to original Outlook item (for applying categories)
+    _outlook_item: object = None
+
+
+class OutlookClient:
+    """Interface to Outlook via COM."""
+    
+    def __init__(self):
+        self._outlook = None
+        self._namespace = None
+        self._inbox = None
+    
+    def connect(self) -> bool:
+        """
+        Connect to Outlook.
+        Returns True if successful, False otherwise.
+        """
+        try:
+            import win32com.client
+            
+            self._outlook = win32com.client.Dispatch("Outlook.Application")
+            self._namespace = self._outlook.GetNamespace("MAPI")
+            
+            # Get inbox folder (6 = olFolderInbox)
+            self._inbox = self._namespace.GetDefaultFolder(6)
+            
+            logger.info(f"Connected to Outlook - Inbox: {self._inbox.Name}")
+            return True
+            
+        except ImportError:
+            logger.error("pywin32 not installed. Run: pip install pywin32")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to connect to Outlook: {e}")
+            logger.error("Make sure Outlook is running and try again.")
+            return False
+    
+    def is_connected(self) -> bool:
+        """Check if Outlook connection is still valid."""
+        try:
+            # Try to access inbox name as a connection test
+            _ = self._inbox.Name
+            return True
+        except:
+            return False
+    
+    def get_emails_since(self, since: datetime) -> list[EmailMessage]:
+        """
+        Get all emails received since the given datetime.
+        """
+        emails = []
+        
+        if not self._inbox:
+            logger.error("Not connected to Outlook")
+            return emails
+        
+        try:
+            # Format datetime for Outlook filter
+            since_str = since.strftime("%m/%d/%Y %H:%M %p")
+            filter_str = f"[ReceivedTime] >= '{since_str}'"
+            
+            items = self._inbox.Items
+            items.Sort("[ReceivedTime]", Descending=True)
+            filtered = items.Restrict(filter_str)
+            
+            for item in filtered:
+                try:
+                    email = self._extract_email(item)
+                    if email:
+                        emails.append(email)
+                except Exception as e:
+                    logger.warning(f"Failed to process email: {e}")
+                    continue
+            
+            logger.debug(f"Found {len(emails)} emails since {since_str}")
+            
+        except Exception as e:
+            logger.error(f"Error querying emails: {e}")
+        
+        return emails
+    
+    def _extract_email(self, item) -> Optional[EmailMessage]:
+        """Extract email data from Outlook item."""
+        try:
+            # Skip non-mail items (meeting requests, etc.)
+            if item.Class != 43:  # 43 = olMail
+                return None
+            
+            # Get sender email
+            sender_email = ""
+            try:
+                if item.SenderEmailType == "EX":
+                    # Exchange address - get SMTP address
+                    sender = item.Sender
+                    if sender:
+                        sender_email = sender.GetExchangeUser()
+                        if sender_email:
+                            sender_email = sender_email.PrimarySmtpAddress
+                        else:
+                            sender_email = item.SenderEmailAddress
+                else:
+                    sender_email = item.SenderEmailAddress
+            except:
+                sender_email = getattr(item, 'SenderEmailAddress', '')
+            
+            # Get attachment names
+            attachment_names = []
+            try:
+                for att in item.Attachments:
+                    attachment_names.append(att.FileName)
+            except:
+                pass
+            
+            # Get current categories
+            categories = []
+            try:
+                if item.Categories:
+                    categories = [c.strip() for c in item.Categories.split(",")]
+            except:
+                pass
+            
+            # Extract body text (prefer plain text over HTML)
+            body = ""
+            try:
+                body = item.Body or ""
+            except:
+                pass
+            
+            return EmailMessage(
+                entry_id=item.EntryID,
+                subject=item.Subject or "",
+                body=body,
+                sender_email=sender_email or "",
+                sender_name=getattr(item, 'SenderName', ''),
+                received_time=datetime.fromtimestamp(item.ReceivedTime.timestamp()),
+                attachment_names=attachment_names,
+                categories=categories,
+                conversation_id=getattr(item, 'ConversationID', ''),
+                _outlook_item=item
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error extracting email: {e}")
+            return None
+    
+    def apply_category(self, email: EmailMessage, category: str) -> bool:
+        """
+        Apply a category to an email.
+        Adds to existing categories (doesn't replace).
+        """
+        try:
+            item = email._outlook_item
+            if not item:
+                logger.error("No Outlook item reference available")
+                return False
+            
+            # Get current categories
+            current = item.Categories or ""
+            current_list = [c.strip() for c in current.split(",") if c.strip()]
+            
+            # Check if already has this category
+            if category in current_list:
+                logger.debug(f"Email already has category '{category}'")
+                return True
+            
+            # Add new category
+            current_list.append(category)
+            item.Categories = ", ".join(current_list)
+            item.Save()
+            
+            logger.info(f"Applied category '{category}' to: {email.subject[:50]}...")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to apply category: {e}")
+            return False
+    
+    def get_available_categories(self) -> list[str]:
+        """Get list of available categories in Outlook."""
+        categories = []
+        try:
+            for cat in self._namespace.Categories:
+                categories.append(cat.Name)
+        except Exception as e:
+            logger.warning(f"Could not retrieve categories: {e}")
+        return categories

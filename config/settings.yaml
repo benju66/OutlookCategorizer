@@ -1,0 +1,31 @@
+# Outlook Email Categorization Engine - Settings
+# ================================================
+
+# Dry-run mode (RECOMMENDED: keep true until you verify it works)
+# true  = logs what it WOULD do, but doesn't apply categories
+# false = actually applies categories to emails
+dry_run: false
+
+# How often to check for new emails (in seconds)
+poll_interval_seconds: 60
+
+# Minimum score required to apply a category
+# Individual rules can override this
+default_threshold: 40
+
+# Outlook folder to monitor
+folder: "Inbox"
+
+# Logging level: DEBUG, INFO, WARNING, ERROR
+log_level: INFO
+
+# Skip emails that already have this specific category assigned
+# (Other categories are fine - we support multiple)
+# Leave empty to never skip based on category
+skip_if_has_category: []
+
+# First-run behavior
+# Only process emails received after this date (YYYY-MM-DD)
+# Set to "today" to only process emails from today onward
+# Set to "deploy" to only process emails after first run (creates marker file)
+start_from: "deploy"
