@@ -15,12 +15,15 @@ from PyQt6.QtWidgets import (
     QMenuBar,
     QStatusBar,
     QMessageBox,
+    QLabel,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction, QKeySequence
 
 from ..services.category_service import CategoryService
 from .presenters.base_presenter import BasePresenter
+from .presenters.category_presenter import CategoryPresenter
+from .views.category_list import CategoryList
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,9 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.category_service = category_service
         
+        # Initialize presenter
+        self.category_presenter = CategoryPresenter(category_service)
+        
         # Window properties
         self.setWindowTitle("Outlook Email Categorizer - Rule Manager")
         self.setMinimumSize(1000, 700)
@@ -51,6 +57,9 @@ class MainWindow(QMainWindow):
         self._create_menu_bar()
         self._create_status_bar()
         self._create_central_widget()
+        
+        # Wire up category list
+        self._setup_category_list()
         
         # Status bar message
         self.statusBar().showMessage("Ready")
@@ -71,6 +80,7 @@ class MainWindow(QMainWindow):
                 logger.debug(f"Set window icon: {icon_path}")
             else:
                 logger.warning(f"Icon file not found: {icon_path}")
+                logger.debug(f"Looking for icon at: {icon_path.absolute()}")
         except Exception as e:
             logger.warning(f"Could not set window icon: {e}")
     
@@ -156,19 +166,10 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(splitter)
         
-        # Left panel (category list) - will be added in Phase 2
-        left_panel = QWidget()
-        left_panel.setMinimumWidth(200)
-        left_panel.setMaximumWidth(400)
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Placeholder label
-        from PyQt6.QtWidgets import QLabel
-        placeholder_label = QLabel("Category List\n(Phase 2)")
-        placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder_label.setStyleSheet("color: gray; font-style: italic;")
-        left_layout.addWidget(placeholder_label)
+        # Left panel (category list) - Phase 2
+        self.category_list = CategoryList()
+        self.category_list.setMinimumWidth(200)
+        self.category_list.setMaximumWidth(400)
         
         # Right panel (category editor) - will be added in Phase 3
         right_panel = QWidget()
@@ -182,7 +183,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(placeholder_label2)
         
         # Add panels to splitter
-        splitter.addWidget(left_panel)
+        splitter.addWidget(self.category_list)
         splitter.addWidget(right_panel)
         
         # Set splitter proportions (30% left, 70% right)
@@ -191,13 +192,78 @@ class MainWindow(QMainWindow):
         splitter.setSizes([300, 900])
         
         self.splitter = splitter
-        self.left_panel = left_panel
         self.right_panel = right_panel
+    
+    def _setup_category_list(self):
+        """Set up category list widget and wire up signals."""
+        # Load categories
+        categories = self.category_presenter.load_categories()
+        self.category_list.load_categories(categories)
+        
+        # Wire up signals
+        self.category_list.category_selected.connect(self._on_category_selected)
+        self.category_list.new_category_requested.connect(self._on_new_category_from_list)
+        self.category_list.delete_category_requested.connect(self._on_delete_category)
+        self.category_list.enable_changed.connect(self._on_enable_changed)
+        
+        # Set presenter's view
+        self.category_presenter.set_view(self.category_list)
+        self.category_presenter.initialize()
+    
+    def _on_category_selected(self, category_name: str):
+        """Handle category selection from list."""
+        logger.debug(f"Category selected: {category_name}")
+        rule = self.category_presenter.load_category(category_name)
+        if rule:
+            self.statusBar().showMessage(f"Loaded category: {category_name}", 2000)
+            # TODO: Load into editor (Phase 3)
+        else:
+            self.statusBar().showMessage(f"Failed to load category: {category_name}", 3000)
+    
+    def _on_new_category_from_list(self):
+        """Handle New Category request from list."""
+        logger.debug("New category requested from list")
+        rule = self.category_presenter.create_new_category()
+        if rule:
+            # Add to list
+            self.category_list.load_categories(self.category_presenter.load_categories())
+            # Select the new category
+            self.category_list.select_category(rule.category_name)
+            self.statusBar().showMessage("Created new category - ready to edit", 2000)
+            # TODO: Load into editor (Phase 3)
+    
+    def _on_delete_category(self, category_name: str):
+        """Handle delete category request."""
+        logger.debug(f"Delete category requested: {category_name}")
+        success = self.category_presenter.delete_category(category_name)
+        if success:
+            # Reload categories
+            categories = self.category_presenter.load_categories()
+            self.category_list.load_categories(categories)
+            self.statusBar().showMessage(f"Deleted category: {category_name}", 2000)
+        else:
+            self.statusBar().showMessage(f"Failed to delete category: {category_name}", 3000)
+    
+    def _on_enable_changed(self, category_name: str, enabled: bool):
+        """Handle enable/disable category change."""
+        logger.debug(f"Enable/disable changed for '{category_name}': {enabled}")
+        # Use CategoryService's enable_category method
+        success = self.category_service.enable_category(category_name, enabled)
+        if success:
+            # Reload categories to refresh list
+            categories = self.category_presenter.load_categories()
+            self.category_list.load_categories(categories)
+            # Reselect the category
+            self.category_list.select_category(category_name)
+            status = "enabled" if enabled else "disabled"
+            self.statusBar().showMessage(f"Category '{category_name}' {status}", 2000)
+        else:
+            self.statusBar().showMessage(f"Failed to update category: {category_name}", 3000)
     
     def _on_new_category(self):
         """Handle New Category menu action."""
-        self.statusBar().showMessage("New Category (Phase 2)", 2000)
-        # Will be implemented in Phase 2
+        # Trigger new category from list widget
+        self.category_list._on_new_category()
     
     def _on_open_category(self):
         """Handle Open Category menu action."""

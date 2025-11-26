@@ -53,6 +53,8 @@ def main():
             from PyQt6.QtGui import QIcon
             app.setWindowIcon(QIcon(str(icon_path)))
             logger.debug(f"Set application icon: {icon_path}")
+        else:
+            logger.warning(f"Icon file not found: {icon_path.absolute()}")
     except Exception as e:
         logger.warning(f"Could not set application icon: {e}")
     

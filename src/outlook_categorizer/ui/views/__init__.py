@@ -1,4 +1,6 @@
 """Views for MVP pattern - UI layer."""
 
-# Views will be imported here as they're created
+from .category_list import CategoryList
+
+__all__ = ["CategoryList"]
 
