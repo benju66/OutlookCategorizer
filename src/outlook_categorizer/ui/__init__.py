@@ -1,4 +1,6 @@
-"""PyQt UI components (optional)."""
+"""PyQt UI components."""
 
-# UI will be implemented later
+from .main_window import MainWindow
+
+__all__ = ["MainWindow"]
 
